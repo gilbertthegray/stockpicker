@@ -1,0 +1,7 @@
+streamlit
+plotly
+yfinance
+feedparser
+pandas
+numpy
+vaderSentiment
