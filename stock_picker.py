@@ -301,6 +301,32 @@ def load_snapshots():
 # --------------------------------------------------------------------------- #
 # Commands
 # --------------------------------------------------------------------------- #
+def analyze_ticker(ticker, reference, weights=None):
+    """Score ANY ticker by z-scoring it against a saved snapshot's cross-section.
+    `reference` = DataFrame of one snapshot day. Returns (row, headline items)."""
+    ticker = ticker.upper().strip()
+    prices = download_prices([ticker], period="1y")
+    if ticker not in prices:
+        raise ValueError("no price data found (check the symbol; it needs about 70 trading days of history)")
+    feats = compute_features(prices[ticker])
+    items = gather_headlines({ticker: UNIVERSE.get(ticker, [ticker])})[ticker]
+    feats["sentiment"], feats["n_headlines"] = sentiment_score(items), len(items)
+    if any(pd.isna(feats[f]) for f in FEATURES):
+        raise ValueError("not enough history to compute indicators")
+    weights = weights or load_weights()
+    z = {}
+    for f in FEATURES:
+        sd = reference[f].std(ddof=0)
+        z[f] = 0.0 if not sd > 1e-9 else float(np.clip((feats[f] - reference[f].mean()) / sd, -3, 3))
+    score = sum(weights[f] * z[f] for f in FEATURES)
+    for h in HORIZONS:
+        feats[f"exp_price_d{h}"] = feats["price"] * (1 + MOVE_K * score * feats["atr_pct"] * math.sqrt(h))
+    feats.update(ticker=ticker, run_date=prices[ticker].index[-1].strftime("%Y-%m-%d"), source="lookup",
+                 score=score, direction="BUY" if score >= 0 else "SHORT",
+                 expected_move_pct=(feats[f"exp_price_d{EXPECTED_MOVE_HORIZON_DAYS}"] / feats["price"] - 1) * 100)
+    return pd.Series(feats), items
+
+
 def run_analysis(arg_tickers=None, store="both", default_weights=False):
     """Full pipeline: fetch, score, save. Returns (snapshot_df, run_date)."""
     tickers = [t.upper() for t in arg_tickers] if arg_tickers else list(UNIVERSE)
