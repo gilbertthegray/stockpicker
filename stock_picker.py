@@ -394,6 +394,11 @@ def forward_returns(snaps, horizon):
     return snaps.dropna(subset=["fwd_ret"])
 
 
+def spearman(a, b):
+    """Rank correlation without needing scipy (pandas 3 requires it for method='spearman')."""
+    return a.rank().corr(b.rank())
+
+
 def evaluate_snaps(snaps):
     """snaps: output of forward_returns. Returns (daily metrics, per-feature IC, forecast accuracy)."""
     daily = []
@@ -401,11 +406,11 @@ def evaluate_snaps(snaps):
         top = g[g["rank"] <= TOP_N]
         daily.append({
             "run_date": d,
-            "ic": g["score"].corr(g["fwd_ret"], method="spearman") if len(g) > 5 else np.nan,
+            "ic": spearman(g["score"], g["fwd_ret"]) if len(g) > 5 else np.nan,
             "hit": (np.sign(top["score"]) == np.sign(top["fwd_ret"])).mean(),
             "top_ret": (np.sign(top["score"]) * top["fwd_ret"]).mean(),  # short profits when price falls
         })
-    feat_ic = pd.Series({f: snaps[f].corr(snaps["fwd_ret"], method="spearman") for f in FEATURES})
+    feat_ic = pd.Series({f: spearman(snaps[f], snaps["fwd_ret"]) for f in FEATURES})
     fc = []
     for h in HORIZONS:
         if f"exp_price_d{h}" not in snaps:
