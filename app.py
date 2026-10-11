@@ -10,7 +10,7 @@ import streamlit as st
 
 import stock_picker as sp
 
-BRAND = "Market Movers"
+BRAND = "Gabe's Market Movers"
 UP, DOWN, INK, MUTED = "#0f7b4f", "#c4351c", "#14181f", "#667085"
 T5 = f"exp_price_d{sp.EXPECTED_MOVE_HORIZON_DAYS}"
 
